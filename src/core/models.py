@@ -180,6 +180,7 @@ class ScanResult:
     vulnerabilities: List[Vulnerability] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
     stats: Dict[str, Any] = field(default_factory=dict)
+    pages_scanned: int = 0
 
     # Properties for backward compatibility with scanner/reporters
     @property

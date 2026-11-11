@@ -214,11 +214,13 @@ class PlaywrightScanner:
                 fingerprints.append(fp)
             
             # Build result
+            from datetime import datetime
             result = ScanResult(
                 target=target,
+                started_at=datetime.now(),
                 fingerprints=fingerprints,
                 technologies=unique_techs,
-                scan_duration=time.time() - start_time,
+                duration=time.time() - start_time,
                 pages_scanned=len(self.page_data),
                 errors=[]
             )
@@ -226,11 +228,13 @@ class PlaywrightScanner:
             return result
             
         except Exception as e:
+            from datetime import datetime
             return ScanResult(
                 target=target,
+                started_at=datetime.now(),
                 fingerprints=[],
                 technologies=[],
-                scan_duration=time.time() - start_time,
+                duration=time.time() - start_time,
                 pages_scanned=len(self.page_data),
                 errors=[str(e)]
             )
@@ -855,7 +859,7 @@ if __name__ == "__main__":
         print(f"Scanning {url}...")
         result = await scan_target(url, config)
         
-        print(f"\nScan completed in {result.scan_duration:.2f}s")
+        print(f"\nScan completed in {result.duration:.2f}s")
         print(f"Pages scanned: {result.pages_scanned}")
         print(f"Technologies found: {len(result.technologies)}")
         

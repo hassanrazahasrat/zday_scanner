@@ -154,7 +154,7 @@ def print_summary(result: ScanResult):
     print("SCAN COMPLETE")
     print("="*60)
     print(f"Scan ID: {result.scan_id if hasattr(result, 'scan_id') else 'N/A'}")
-    print(f"Duration: {result.scan_duration:.2f}s")
+    print(f"Duration: {result.duration:.2f}s")
     print(f"Technologies: {len(result.technologies)}")
     print(f"Fingerprints: {len(result.fingerprints)}")
 
