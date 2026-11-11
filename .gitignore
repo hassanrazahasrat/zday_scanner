@@ -1,4 +1,42 @@
+# Python
 .venv
 venv
-config.yaml
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Configuration (local overrides - never commit)
+.env
+.env.local
+.env.*.local
+
+# Playwright
+playwright-report
+test-results
+*.trace.zip
+
+# Output
+reports
+*.html
+*.json
+*.md
+!README.md
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Coverage
+coverage.xml
+htmlcov

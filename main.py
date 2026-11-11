@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ZDay Scanner - CLI Entry Point
-Deep web application security scanner
+Deep web application security scanner using Playwright
 """
 import asyncio
 import argparse
@@ -13,9 +13,10 @@ from typing import List, Optional
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from src.core.models import Target
+from src.core.models import Target, ScanResult
 from src.core.config import ScannerConfig
-from src.core.scanner import ZDayScanner, quick_scan
+from src.scanner.playwright_scanner import PlaywrightScanner, scan_target
+from src.reporting import JSONReporter, HTMLReporter, MarkdownReporter, ReportOptions
 
 
 def parse_args() -> argparse.Namespace:
@@ -25,11 +26,11 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  zday_scan.py -u https://example.com
-  zday_scan.py -u https://example.com -f json html -o ./reports
-  zday_scan.py -u https://example.com --depth 3 --max-pages 50
-  zday_scan.py -u https://example.com --auth-header "Authorization: Bearer token"
-  zday_scan.py -u https://example.com --proxy http://127.0.0.1:8080
+  python -m zday_scan -u https://example.com
+  python -m zday_scan -u https://example.com -f json html -o ./reports
+  python -m zday_scan -u https://example.com --depth 3 --max-pages 50
+  python -m zday_scan -u https://example.com --browser-path auto
+  python -m zday_scan -u https://example.com --cdp-endpoint http://localhost:9222
         """
     )
 
@@ -43,8 +44,15 @@ Examples:
     parser.add_argument("--rate-limit", type=float, default=10.0, help="Requests per second (default: 10)")
     parser.add_argument("--concurrency", type=int, default=10, help="Max concurrent requests (default: 10)")
 
-    # Feature toggles
+    # Browser / Playwright options
     parser.add_argument("--no-headless", action="store_true", help="Disable headless browser fingerprinting")
+    parser.add_argument("--browser-path", help="Browser executable path (default: auto-detect)")
+    parser.add_argument("--browser-channel", choices=["chrome", "msedge", "chromium", "brave"],
+                       help="Browser channel to use")
+    parser.add_argument("--cdp-endpoint", help="Connect to existing browser via CDP (e.g., http://localhost:9222)")
+    parser.add_argument("--browser-args", help="Comma-separated browser args")
+
+    # Feature toggles
     parser.add_argument("--no-version-detection", action="store_true", help="Disable version detection")
     parser.add_argument("--no-cve-matching", action="store_true", help="Disable CVE matching")
     parser.add_argument("--no-injection-tests", action="store_true", help="Disable injection tests")
@@ -109,6 +117,16 @@ def build_config(args: argparse.Namespace) -> ScannerConfig:
     config.verify_ssl = True
     config.follow_redirects = True
 
+    # Browser settings
+    if args.browser_path:
+        config.browser_executable_path = args.browser_path
+    if args.browser_channel:
+        config.browser_channel = args.browser_channel
+    if args.cdp_endpoint:
+        config.cdp_endpoint = args.cdp_endpoint
+    if args.browser_args:
+        config.browser_args = [a.strip() for a in args.browser_args.split(",")]
+
     # Auth headers
     if args.auth_header:
         for h in args.auth_header:
@@ -128,6 +146,48 @@ def build_config(args: argparse.Namespace) -> ScannerConfig:
         config.proxy = args.proxy
 
     return config
+
+
+def print_summary(result: ScanResult):
+    """Print scan summary"""
+    print("\n" + "="*60)
+    print("SCAN COMPLETE")
+    print("="*60)
+    print(f"Scan ID: {result.scan_id if hasattr(result, 'scan_id') else 'N/A'}")
+    print(f"Duration: {result.scan_duration:.2f}s")
+    print(f"Technologies: {len(result.technologies)}")
+    print(f"Fingerprints: {len(result.fingerprints)}")
+
+    # Count by severity
+    by_sev = {}
+    for fp in result.fingerprints:
+        # Map confidence to severity-ish
+        if fp.confidence >= 0.9:
+            sev = "high"
+        elif fp.confidence >= 0.7:
+            sev = "medium"
+        elif fp.confidence >= 0.5:
+            sev = "low"
+        else:
+            sev = "info"
+        by_sev[sev] = by_sev.get(sev, 0) + 1
+
+    for sev in ["high", "medium", "low", "info"]:
+        if by_sev.get(sev, 0) > 0:
+            print(f"  {sev.title()}: {by_sev[sev]}")
+
+    if result.errors:
+        print(f"\nErrors: {len(result.errors)}")
+        for err in result.errors[:5]:
+            print(f"  - {err}")
+
+    if result.reports:
+        print("\nReports generated:")
+        for fmt, path in result.reports.items():
+            if os.path.exists(path):
+                print(f"  {fmt.upper()}: {path}")
+            else:
+                print(f"  {fmt.upper()}: (embedded)")
 
 
 async def main():
@@ -151,13 +211,23 @@ async def main():
 
     # Print banner
     banner = """
-    ZDay Scanner v1.0.0
-    Deep Web Application Security Scanner
+    ╔══════════════════════════════════════════════════════════════╗
+    ║  ZDay Scanner v1.0.0                                        ║
+    ║  Deep Web Application Security Scanner                      ║
+    ║  Powered by Playwright                                       ║
+    ╚══════════════════════════════════════════════════════════════╝
     """
     print(banner)
 
     print(f"[*] Target: {args.url}")
     print(f"[*] Depth: {args.depth} | Max Pages: {args.max_pages} | Rate: {args.rate_limit}/s")
+    print(f"[*] Headless: {'Enabled' if config.enable_headless_fingerprinting else 'Disabled'}")
+    if config.browser_executable_path:
+        print(f"[*] Browser: {config.browser_executable_path}")
+    if config.browser_channel:
+        print(f"[*] Channel: {config.browser_channel}")
+    if config.cdp_endpoint:
+        print(f"[*] CDP: {config.cdp_endpoint}")
     print(f"[*] Formats: {', '.join(output_formats)}")
     if args.output_dir:
         print(f"[*] Output: {args.output_dir}")
@@ -165,45 +235,53 @@ async def main():
 
     # Run scan
     try:
-        async with ZDayScanner(config) as scanner:
-            result = await scanner.scan(target, output_formats, args.output_dir)
+        async with PlaywrightScanner(config) as scanner:
+            result = await scanner.scan(target)
 
-        # Print summary
-        print("\n" + "="*60)
-        print("SCAN COMPLETE")
-        print("="*60)
-        print(f"Scan ID: {result.scan_id}")
-        print(f"Duration: {result.duration:.2f}s")
-        print(f"Technologies: {len(result.technologies)}")
-        print(f"Vulnerabilities: {len(result.vulnerabilities)}")
+        # Generate reports if requested
+        if output_formats:
+            options = ReportOptions(
+                include_technologies=True,
+                include_vulnerabilities=True,
+                include_evidence=True,
+                include_remediation=True,
+                min_severity=args.min_severity,
+            )
 
-        # Count by severity
-        by_sev = {}
-        for v in result.vulnerabilities:
-            sev = v.severity.value
-            by_sev[sev] = by_sev.get(sev, 0) + 1
+            reporters = {
+                "json": JSONReporter(options),
+                "html": HTMLReporter(options),
+                "markdown": MarkdownReporter(options),
+            }
 
-        for sev in ["critical", "high", "medium", "low", "info"]:
-            if by_sev.get(sev, 0) > 0:
-                print(f"  {sev.title()}: {by_sev[sev]}")
+            for fmt in output_formats:
+                if fmt in reporters:
+                    try:
+                        report_content = reporters[fmt].generate(result)
+                        ext = reporters[fmt].get_extension()
 
-        if result.errors:
-            print(f"\nErrors: {len(result.errors)}")
-            for err in result.errors[:5]:
-                print(f"  - {err}")
+                        if args.output_dir:
+                            import os
+                            os.makedirs(args.output_dir, exist_ok=True)
+                            filename = f"zday_report_{result.scan_id if hasattr(result, 'scan_id') else 'scan'}{ext}"
+                            filepath = os.path.join(args.output_dir, filename)
+                            with open(filepath, 'w') as f:
+                                f.write(report_content)
+                            if not hasattr(result, 'reports'):
+                                result.reports = {}
+                            result.reports[fmt] = filepath
+                        else:
+                            if not hasattr(result, 'reports'):
+                                result.reports = {}
+                            result.reports[fmt] = report_content
+                    except Exception as e:
+                        result.errors.append(f"Report generation ({fmt}) failed: {e}")
 
-        if result.reports:
-            print("\nReports generated:")
-            for fmt, path in result.reports.items():
-                if os.path.exists(path):
-                    print(f"  {fmt.upper()}: {path}")
-                else:
-                    print(f"  {fmt.upper()}: (embedded)")
+        print_summary(result)
 
-        # Exit code based on findings
-        if by_sev.get("critical", 0) > 0:
-            sys.exit(2)
-        elif by_sev.get("high", 0) > 0:
+        # Exit code based on findings (high confidence = potential issues)
+        high_conf = sum(1 for fp in result.fingerprints if fp.confidence >= 0.9)
+        if high_conf > 10:
             sys.exit(1)
         else:
             sys.exit(0)

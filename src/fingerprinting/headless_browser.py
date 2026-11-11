@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from src.fingerprinting.base import FingerprinterBase, register_fingerprinter
 from src.core.config import ScannerConfig
+from src.core.models import Technology
 
 
 @register_fingerprinter("headless")
@@ -38,15 +39,7 @@ class HeadlessBrowserFingerprinter(FingerprinterBase):
 
             async with async_playwright() as p:
                 self._playwright = p
-                browser = await p.chromium.launch(
-                    headless=self.config.headless,
-                    args=[
-                        "--disable-blink-features=AutomationControlled",
-                        "--disable-dev-shm-usage",
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                    ]
-                )
+                browser = await self._launch_browser(p)
                 self._browser = browser
 
                 context = await browser.new_context(
@@ -95,6 +88,123 @@ class HeadlessBrowserFingerprinter(FingerprinterBase):
             pass
 
         return results
+
+    async def _launch_browser(self, playwright):
+        """Launch browser with configured executable path or CDP connection"""
+        import sys
+        from pathlib import Path
+
+        # If CDP endpoint is configured, connect to existing browser
+        if self.config.cdp_endpoint:
+            return await playwright.chromium.connect_over_cdp(self.config.cdp_endpoint)
+
+        # Build launch arguments
+        launch_args = [
+            "--disable-blink-features=AutomationControlled",
+            "--disable-dev-shm-usage",
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+        ]
+        # Add custom browser args from config
+        if self.config.browser_args:
+            launch_args.extend(self.config.browser_args)
+
+        # Determine executable path
+        executable_path = self._resolve_browser_path()
+        channel = self.config.browser_channel if self.config.browser_channel else None
+
+        # Launch browser
+        if executable_path and executable_path != "auto":
+            # Explicit path provided
+            return await playwright.chromium.launch(
+                headless=self.config.headless,
+                executable_path=executable_path,
+                args=launch_args,
+            )
+        elif channel:
+            # Use channel (chrome, msedge, chromium, brave)
+            return await playwright.chromium.launch(
+                headless=self.config.headless,
+                channel=channel,
+                args=launch_args,
+            )
+        else:
+            # Auto-detect or use Playwright bundled
+            if executable_path == "auto":
+                auto_path = self._auto_detect_browser()
+                if auto_path:
+                    return await playwright.chromium.launch(
+                        headless=self.config.headless,
+                        executable_path=auto_path,
+                        args=launch_args,
+                    )
+            # Fallback to Playwright's bundled browser
+            return await playwright.chromium.launch(
+                headless=self.config.headless,
+                args=launch_args,
+            )
+
+    def _resolve_browser_path(self) -> Optional[str]:
+        """Resolve browser executable path from config"""
+        path = self.config.browser_executable_path
+        if not path or path == "auto":
+            return "auto"
+        # Expand user directory
+        from pathlib import Path
+        expanded = Path(path).expanduser()
+        if expanded.exists():
+            return str(expanded)
+        return None
+
+    def _auto_detect_browser(self) -> Optional[str]:
+        """Auto-detect system Chrome/Chromium/Edge/Brave across platforms"""
+        import sys
+        from pathlib import Path
+
+        candidates = []
+
+        if sys.platform == "darwin":  # macOS
+            candidates = [
+                "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                "/Applications/Chromium.app/Contents/MacOS/Chromium",
+                "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+                "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+                "/Applications/Vivaldi.app/Contents/MacOS/Vivaldi",
+            ]
+        elif sys.platform == "win32":  # Windows
+            import os
+            program_files = os.environ.get("PROGRAMFILES", "C:\\Program Files")
+            program_files_x86 = os.environ.get("PROGRAMFILES(X86)", "C:\\Program Files (x86)")
+            local_app_data = os.environ.get("LOCALAPPDATA", "")
+
+            candidates = [
+                f"{program_files}\\Google\\Chrome\\Application\\chrome.exe",
+                f"{program_files_x86}\\Google\\Chrome\\Application\\chrome.exe",
+                f"{local_app_data}\\Google\\Chrome\\Application\\chrome.exe",
+                f"{program_files}\\Microsoft\\Edge\\Application\\msedge.exe",
+                f"{program_files_x86}\\Microsoft\\Edge\\Application\\msedge.exe",
+                f"{program_files}\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
+                f"{local_app_data}\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
+                f"{program_files}\\Vivaldi\\Application\\vivaldi.exe",
+            ]
+        else:  # Linux
+            candidates = [
+                "/usr/bin/google-chrome",
+                "/usr/bin/google-chrome-stable",
+                "/usr/bin/chromium",
+                "/usr/bin/chromium-browser",
+                "/usr/bin/microsoft-edge",
+                "/usr/bin/microsoft-edge-stable",
+                "/usr/bin/brave-browser",
+                "/usr/bin/brave-browser-stable",
+                "/usr/bin/vivaldi",
+                "/usr/bin/vivaldi-stable",
+            ]
+
+        for path in candidates:
+            if Path(path).exists():
+                return path
+        return None
 
     async def _inject_stealth(self, context):
         """Inject stealth scripts to avoid detection"""

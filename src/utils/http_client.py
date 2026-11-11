@@ -184,6 +184,9 @@ class HTTPClient:
         await self.close()
 
 
+# Alias for backward compatibility
+AsyncHTTPClient = HTTPClient
+
 class Crawler:
     """Simple web crawler for discovering pages"""
 

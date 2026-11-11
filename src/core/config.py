@@ -14,6 +14,15 @@ except ImportError:
     yaml = None
     HAS_YAML = False
 
+# Optional .env support
+try:
+    from dotenv import load_dotenv
+    HAS_DOTENV = True
+except ImportError:
+    HAS_DOTENV = False
+    def load_dotenv(path: str = None, override: bool = False):
+        pass
+
 
 @dataclass
 class ScannerConfig:
@@ -56,6 +65,16 @@ class ScannerConfig:
     custom_cookies: Dict[str, str] = field(default_factory=dict)
     auth_headers: Dict[str, str] = field(default_factory=dict)
 
+    # Browser / Playwright
+    headless: bool = True
+    browser_timeout: int = 30
+    browser_wait_until: str = "networkidle"
+    enable_stealth: bool = True
+    browser_executable_path: Optional[str] = "auto"  # "auto", "/path/to/chrome", "", None
+    browser_channel: str = ""                      # "chrome", "msedge", "chromium", "brave"
+    browser_args: List[str] = field(default_factory=list)
+    cdp_endpoint: str = ""                          # CDP endpoint for existing browser
+
     # Advanced
     user_agent: str = "ZDay Scanner/1.0"
     debug: bool = False
@@ -72,8 +91,22 @@ class ScannerConfig:
         return cls(**data) if data else cls()
 
     @classmethod
-    def from_env(cls) -> "ScannerConfig":
-        """Load configuration from environment variables"""
+    def from_env(cls, env_file: str = None) -> "ScannerConfig":
+        """Load configuration from environment variables and .env file"""
+        # Load .env file if available
+        if env_file and HAS_DOTENV:
+            load_dotenv(env_file, override=True)
+        elif HAS_DOTENV:
+            # Try default locations
+            for path in [
+                Path.cwd() / ".env",
+                Path.cwd() / ".env.local",
+                Path(__file__).parent.parent.parent / ".env",
+            ]:
+                if path.exists():
+                    load_dotenv(path, override=True)
+                    break
+
         config = cls()
 
         # Map env vars to config fields
@@ -102,7 +135,27 @@ class ScannerConfig:
             "ZDAY_DEBUG": ("debug", lambda x: x.lower() == "true"),
         }
 
+        # Browser / Playwright env vars
+        browser_env_map = {
+            "ZDAY_HEADLESS": ("headless", lambda x: x.lower() == "true"),
+            "ZDAY_BROWSER_TIMEOUT": ("browser_timeout", int),
+            "ZDAY_BROWSER_WAIT_UNTIL": ("browser_wait_until", str),
+            "ZDAY_ENABLE_STEALTH": ("enable_stealth", lambda x: x.lower() == "true"),
+            "ZDAY_BROWSER_EXECUTABLE_PATH": ("browser_executable_path", str),
+            "ZDAY_BROWSER_CHANNEL": ("browser_channel", str),
+            "ZDAY_BROWSER_ARGS": ("browser_args", lambda x: x.split(",") if x else []),
+            "ZDAY_CDP_ENDPOINT": ("cdp_endpoint", str),
+        }
+
         for env_var, (attr, converter) in env_map.items():
+            value = os.environ.get(env_var)
+            if value is not None:
+                try:
+                    setattr(config, attr, converter(value))
+                except Exception:
+                    pass
+
+        for env_var, (attr, converter) in browser_env_map.items():
             value = os.environ.get(env_var)
             if value is not None:
                 try:
