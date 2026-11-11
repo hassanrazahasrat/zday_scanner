@@ -205,8 +205,8 @@ async def main():
     # Create target
     target = Target(
         url=args.url,
-        custom_headers=config.custom_headers,
-        custom_cookies=config.custom_cookies,
+        headers=config.custom_headers,
+        cookies=config.custom_cookies,
     )
 
     # Print banner

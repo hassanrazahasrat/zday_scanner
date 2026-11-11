@@ -4,6 +4,7 @@ ZDay Scanner - Local Fingerprint Database
 """
 import json
 import re
+from collections import defaultdict
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field, asdict
@@ -106,7 +107,7 @@ class FingerprintDB:
             for p in item.get("url_patterns", []):
                 sig.url_patterns.append(re.compile(p, re.IGNORECASE))
             for p in item.get("version_extractors", []):
-                sig.version_extractors.append(re.compile(p, re.IGNORECASE))
+                sig.version_extractors.append(re.compile(p, re.IGNORECASE) if isinstance(p, str) else p)
 
             db.add(sig)
 
@@ -185,7 +186,7 @@ def create_default_database() -> FingerprintDB:
         {"name": "React", "category": "library", "scripts": ["react", "ReactDOM"], "body_patterns": ["data-reactroot", "data-reactid"], "confidence_base": 0.85},
         {"name": "Vue.js", "category": "library", "scripts": ["vue"], "body_patterns": ["data-v-", "v-cloak", "v-app"], "confidence_base": 0.85},
         {"name": "Angular", "category": "library", "scripts": ["angular", "zone.js"], "body_patterns": ["ng-app", "ng-version"], "confidence_base": 0.85},
-        {"name": "jQuery", "category": "library", "scripts": ["jquery"], "confidence_base": 0.9, "version_extractors": ["jquery[.-](\d+\.\d+\.\d+)"]},
+        {"name": "jQuery", "category": "library", "scripts": ["jquery"], "confidence_base": 0.9, "version_extractors": [r"jquery[.-](\d+\.\d+\.\d+)"]},
         {"name": "Bootstrap", "category": "library", "body_patterns": ["bootstrap"], "scripts": ["bootstrap"], "confidence_base": 0.8},
         {"name": "Tailwind CSS", "category": "library", "body_patterns": ["tailwind"], "confidence_base": 0.7},
     ]
@@ -210,7 +211,7 @@ def create_default_database() -> FingerprintDB:
         for p in item.get("body_patterns", []):
             sig.body_patterns.append(re.compile(p, re.IGNORECASE))
         for p in item.get("version_extractors", []):
-            sig.version_extractors.append(re.compile(p, re.IGNORECASE))
+            sig.version_extractors.append(re.compile(p, re.IGNORECASE) if isinstance(p, str) else p)
 
         db.add(sig)
 
