@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZDay Scanner Report - {target}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {{{{{{{{ font-family: "Inter", sans-serif; }}}}
+        .severity-critical {{{{ border-left-color: #dc2626; }}}}
+        .severity-high {{{{ border-left-color: #ea580c; }}}}
+        .severity-medium {{{{ border-left-color: #d97706; }}}}
+        .severity-low {{{{ border-left-color: #2563eb; }}}}
+        .severity-info {{{{ border-left-color: #64748b; }}}}
+        .badge-critical {{{{ background: #fef2f2; color: #dc2626; }}}}
+        .badge-high {{{{ background: #fff7ed; color: #ea580c; }}}}
+        .badge-medium {{{{ background: #fffbeb; color: #d97706; }}}}
+        .badge-low {{{{ background: #eff6ff; color: #2563eb; }}}}
+        .badge-info {{{{ background: #f1f5f9; color: #64748b; }}}}
+        .vuln-card {{{{ transition: all 0.2s; }}}}
+        .vuln-card:hover {{{{ box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); transform: translateY(-2px); }}}}
+        .tech-badge {{{{ background: #f3f4f6; color: #374151; }}}}
+        .chart-container {{{{ position: relative; height: 300px; }}}}
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div id="app">
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-900">ZDay Scanner Report</h1>
+                        <p class="text-gray-500 mt-1">{target}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm text-gray-500">Scan ID: {scan_id}</p>
+                        <p class="text-sm text-gray-500">Duration: {duration:.1f}s</p>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+                <div class="bg-white rounded-lg shadow p-6 border-l-4 severity-critical">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <svg class="h-8 w-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-500">Critical</p>
+                            <p class="text-3xl font-bold text-gray-900">{crit}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6 border-l-4 severity-high">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <svg class="h-8 w-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-500">High</p>
+                            <p class="text-3xl font-bold text-gray-900">{high}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6 border-l-4 severity-medium">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <svg class="h-8 w-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-500">Medium</p>
+                            <p class="text-3xl font-bold text-gray-900">{medium}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6 border-l-4 severity-low">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <svg class="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-500">Low</p>
+                            <p class="text-3xl font-bold text-gray-900">{low}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6 border-l-4 severity-info">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <svg class="h-8 w-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-500">Info</p>
+                            <p class="text-3xl font-bold text-gray-900">{info}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Vulnerabilities by Severity</h3>
+                    <div class="chart-container">
+                        <canvas id="severityChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Vulnerabilities by Type</h3>
+                    <div class="chart-container">
+                        <canvas id="typeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vulnerabilities Table -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="px-6 py-4 border-b flex items-center justify-between">
+                    <h2 class="text-xl font-semibold text-gray-900">Vulnerabilities ({total_vulns})</h2>
+                    <div class="flex gap-2">
+                        <select id="severityFilter" class="border rounded px-3 py-1 text-sm">
+                            <option value="all">All Severities</option>
+                            <option value="critical">Critical</option>
+                            <option value="high">High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                            <option value="info">Info</option>
+                        </select>
+                        <input type="text" id="searchFilter" placeholder="Search..." class="border rounded px-3 py-1 text-sm">
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full" id="vulnTable">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Severity</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Module</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Confidence</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="vulnBody">
+                        </tbody>
+                    </table>
+
+                <!-- Technologies Section -->
+                <div class="px-6 py-4 border-t">
+                    <h2 class="text-xl font-semibold text-gray-900">Technologies ({total_techs})</h2>
+                    <div id="techContainer" class="mt-4"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Modal for Vulnerability Details -->
+        <div id="vulnModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50">
+            <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+                <div class="p-6 border-b flex justify-between items-center">
+                    <h3 id="modalTitle" class="text-lg font-semibold text-gray-900"></h3>
+                    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div id="modalContent" class="p-6"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Embedded Data -->
+    <script>
+        const reportData = {data_json};        
+        // Initialize on load
+        document.addEventListener("DOMContentLoaded", function() {{
+            initCharts();
+            renderVulns();
+            renderTechs();
+        }});
+
+        // Chart initialization
+        function initCharts() {{
+            const severityCtx = document.getElementById("severityChart").getContext("2d");
+            new Chart(severityCtx, {{
+                type: "doughnut",
+                data: {{
+                    labels: ["Critical", "High", "Medium", "Low", "Info"],
+                    datasets: [{{
+                        data: [
+                            reportData.summary.by_severity.critical || 0,
+                            reportData.summary.by_severity.high || 0,
+                            reportData.summary.by_severity.medium || 0,
+                            reportData.summary.by_severity.low || 0,
+                            reportData.summary.by_severity.info || 0,
+                        ],
+                        backgroundColor: ["#dc2626", "#ea580c", "#d97706", "#2563eb", "#64748b"],
+                        borderWidth: 0,
+                    }}]
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {{ legend: {{ position: "bottom" }} }}
+                }}
+            }});
+
+            // Type chart
+            const typeData = reportData.summary.by_type || {{}};
+            const typeCtx = document.getElementById("typeChart").getContext("2d");
+            new Chart(typeCtx, {{
+                type: "bar",
+                data: {{
+                    labels: Object.keys(typeData),
+                    datasets: [{{
+                        label: "Count",
+                        data: Object.values(typeData),
+                        backgroundColor: "#3b82f6",
+                        borderRadius: 4,
+                    }}]
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: "y",
+                    plugins: {{ legend: {{ display: false }} }},
+                    scales: {{ x: {{ beginAtZero: true }} }}
+                }}
+            }});
+        }}
+
+        // Render vulnerabilities table
+        function renderVulns(filterSeverity = "all", search = "") {{
+            const tbody = document.getElementById("vulnBody");
+            tbody.innerHTML = "";
+
+            const filtered = reportData.vulnerabilities.filter(function(v) {{
+                const sevMatch = filterSeverity === "all" || v.severity === filterSeverity;
+                const searchMatch = search === "" ||
+                    v.title.toLowerCase().includes(search.toLowerCase()) ||
+                    v.location.toLowerCase().includes(search.toLowerCase()) ||
+                    v.type.toLowerCase().includes(search.toLowerCase());
+                return sevMatch && searchMatch;
+            }});
+
+            filtered.forEach(function(v) {{
+                const tr = document.createElement("tr");
+                tr.className = "vuln-card hover:bg-gray-50";
+                const severityClass = "badge-" + v.severity;
+                tr.innerHTML =
+                    "<td class="px-6 py-4">" +
+                        "<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full " + severityClass + "">" +
+                            v.severity.charAt(0).toUpperCase() + v.severity.slice(1) +
+                        "</span>" +
+                    "</td>" +
+                    "<td class="px-6 py-4 text-sm text-gray-900">" + v.type.replace(/_/g, " ") + "</td>" +
+                    "<td class="px-6 py-4 text-sm text-gray-900 font-medium">" + v.title + "</td>" +
+                    "<td class="px-6 py-4 text-sm text-gray-500 font-mono text-xs break-all">" + v.location + "</td>" +
+                    "<td class="px-6 py-4 text-sm text-gray-500">" + v.scanner_module + "</td>" +
+                    "<td class="px-6 py-4 text-sm text-gray-500">" + (v.confidence * 100).toFixed(0) + "%</td>" +
+                    "<td class="px-6 py-4">" +
+                        "<button onclick="showModal(" + JSON.stringify(v).replace(/"/g, '"') + ")" class="text-blue-600 hover:text-blue-900 text-sm font-medium">Details</button>" +
+                    "</td>";
+                tbody.appendChild(tr);
+            }});
+        }}
+
+        // Show modal
+        function showModal(vuln) {{
+            document.getElementById("modalTitle").textContent = vuln.title;
+            document.getElementById("modalContent").innerHTML =
+                "<dl class="grid grid-cols-1 gap-4">" +
+                    "<dt class="text-sm font-medium text-gray-500">Severity</dt>" +
+                    "<dd class="text-sm text-gray-900"><span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full badge-" + vuln.severity + "">" + vuln.severity + "</span></dd>" +
+                    "<dt class="text-sm font-medium text-gray-500">Type</dt>" +
+                    "<dd class="text-sm text-gray-900">" + vuln.type.replace(/_/g, " ") + "</dd>" +
+                    "<dt class="text-sm font-medium text-gray-500">Location</dt>" +
+                    "<dd class="text-sm text-gray-900 font-mono text-xs break-all">" + vuln.location + "</dd>" +
+                    "<dt class="text-sm font-medium text-gray-500">Parameter</dt>" +
+                    "<dd class="text-sm text-gray-900">" + (vuln.parameter || "N/A") + "</dd>" +
+                    "<dt class="text-sm font-medium text-gray-500">Payload</dt>" +
+                    "<dd class="text-sm text-gray-900 font-mono text-xs bg-gray-100 p-2 rounded">" + (vuln.payload || "N/A") + "</dd>" +
+                    "<dt class="text-sm font-medium text-gray-500">Description</dt>" +
+                    "<dd class="text-sm text-gray-900">" + vuln.description + "</dd>" +
+                    "<dt class="text-sm font-medium text-gray-500">Evidence</dt>" +
+                    "<dd class="text-sm text-gray-900 font-mono text-xs bg-gray-100 p-2 rounded">" + (vuln.evidence || "N/A") + "</dd>" +
+                    "<dt class="text-sm font-medium text-gray-500">Remediation</dt>" +
+                    "<dd class="text-sm text-gray-900">" + (vuln.remediation || "N/A") + "</dd>" +
+                    "<dt class="text-sm font-medium text-gray-500">CWE</dt>" +
+                    "<dd class="text-sm text-gray-900">" + (vuln.cwe || "N/A") + "</dd>" +
+                    "<dt class="text-sm font-medium text-gray-500">CVSS</dt>" +
+                    "<dd class="text-sm text-gray-900">" + (vuln.cvss || "N/A") + " (Score: " + (vuln.cvss_score || "N/A") + ")</dd>" +
+                    "<dt class="text-sm font-medium text-gray-500">References</dt>" +
+                    "<dd class="text-sm text-gray-900">" +
+                        "<ul class="list-disc list-inside space-y-1">" +
+                            (vuln.references && vuln.references.length > 0
+                                ? vuln.references.map(function(r) {{ return "<li><a href="" + r + "" target="_blank" class="text-blue-600 hover:underline">" + r + "</a></li>"; }}).join("")
+                                : "None") +
+                        "</ul>" +
+                    "</dd>" +
+                    "<dt class="text-sm font-medium text-gray-500">Scanner Module</dt>" +
+                    "<dd class="text-sm text-gray-900">" + vuln.scanner_module + "</dd>" +
+                    "<dt class="text-sm font-medium text-gray-500">Confidence</dt>" +
+                    "<dd class="text-sm text-gray-900">" + (vuln.confidence * 100).toFixed(0) + "%</dd>" +
+                "</dl>";
+            document.getElementById("vulnModal").classList.remove("hidden");
+            document.getElementById("vulnModal").classList.add("flex");
+        }}
+
+        function closeModal() {{
+            document.getElementById("vulnModal").classList.add("hidden");
+            document.getElementById("vulnModal").classList.remove("flex");
+        }}
+
+        // Render technologies
+        function renderTechs() {{
+            const container = document.getElementById("techContainer");
+            const byCategory = {{}};
+
+            reportData.technologies.forEach(function(t) {{
+                if (!byCategory[t.category]) byCategory[t.category] = [];
+                byCategory[t.category].push(t);
+            }});
+
+            Object.entries(byCategory).forEach(function(entry) {{
+                var cat = entry[0];
+                var techs = entry[1];
+                const catDiv = document.createElement("div");
+                catDiv.className = "w-full";
+                catDiv.innerHTML = "<h4 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">" + cat + "</h4>";
+
+                const wrap = document.createElement("div");
+                wrap.className = "flex flex-wrap gap-2";
+
+                techs.forEach(function(t) {{
+                    const badge = document.createElement("span");
+                    badge.className = "tech-badge inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium";
+                    badge.innerHTML = t.name + " <span class="ml-1 text-gray-400">" + (t.version || "?") + "</span> <span class="ml-2 px-1.5 py-0.5 bg-gray-200 rounded">" + (t.confidence * 100).toFixed(0) + "%</span>";
+                    wrap.appendChild(badge);
+                }});
+
+                catDiv.appendChild(wrap);
+                container.appendChild(catDiv);
+            }});
+        }}
+
+        // Event listeners
+        document.getElementById("severityFilter").addEventListener("change", function(e) {{
+            renderVulns(e.target.value, document.getElementById("searchFilter").value);
+        }});
+
+        document.getElementById("searchFilter").addEventListener("input", function(e) {{
+            renderVulns(document.getElementById("severityFilter").value, e.target.value);
+        }});
+
+        document.getElementById("vulnModal").addEventListener("click", function(e) {{
+            if (e.target.id === "vulnModal") closeModal();
+        }});
+    </script>
+</body>
+</html>

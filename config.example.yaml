@@ -1,0 +1,45 @@
+# ZDay Scanner Configuration
+# All settings can be overridden via environment variables (ZDAY_*) or CLI args
+
+# Network settings
+timeout: 30                    # Request timeout in seconds
+rate_limit: 10.0              # Requests per second
+max_concurrent: 10            # Max concurrent requests
+max_pages: 100                # Maximum pages to crawl
+crawl_depth: 2                # Crawl depth
+follow_redirects: true        # Follow HTTP redirects
+verify_ssl: true              # Verify SSL certificates
+user_agent: "ZDay Scanner/1.0 (+https://github.com/hassanrazahasrat/zday_scanner)"
+
+# Proxy
+proxy: null                   # Proxy URL (e.g., http://127.0.0.1:8080)
+
+# Authentication
+custom_headers: {}            # Custom headers (key: value)
+custom_cookies: {}            # Custom cookies (key: value)
+
+# Feature toggles
+enable_headless_fingerprinting: true   # Enable Playwright-based fingerprinting
+enable_version_detection: true         # Enable version detection
+enable_cve_matching: true              # Enable CVE matching
+enable_injection_tests: true           # Enable injection tests (SQLi, XSS, etc.)
+enable_deserialization_tests: true     # Enable deserialization tests
+enable_auth_bypass_tests: true         # Enable auth bypass tests
+enable_logic_tests: true               # Enable business logic tests
+enable_race_condition_tests: false     # Enable race condition tests (intrusive)
+enable_crypto_tests: true              # Enable crypto tests
+enable_intrusive_tests: false          # Enable intrusive tests
+
+# Headless browser settings
+headless: true                # Run browser headless
+browser_timeout: 30           # Browser timeout in seconds
+browser_wait_until: "networkidle"  # Wait condition
+enable_stealth: true          # Enable stealth mode
+
+# Reporting
+default_formats: ["html", "json"]  # Default output formats
+min_severity: "info"              # Minimum severity to report
+
+# Paths
+data_dir: "./data"            # Data directory
+output_dir: "./reports"       # Default output directory
