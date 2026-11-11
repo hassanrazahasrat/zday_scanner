@@ -15,11 +15,10 @@ class FrameworkFingerprinter(FingerprinterBase):
 
     def __init__(self, config):
         super().__init__(config)
-        self.signatures = self._build_signatures()
 
-    def _build_signatures(self) -> List[FingerprintSignature]:
-        """Build framework signatures"""
-        return [
+    def _load_signatures(self):
+        """Load framework signatures"""
+        self.signatures = [
             # Django
             FingerprintSignature(
                 name="Django",

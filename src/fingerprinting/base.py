@@ -46,6 +46,8 @@ class FingerprinterBase(ABC):
     def __init__(self, config):
         self.config = config
         self.signatures: List[FingerprintSignature] = []
+        import logging
+        self.logger = logging.getLogger(self.__class__.__name__)
         self._load_signatures()
 
     @abstractmethod

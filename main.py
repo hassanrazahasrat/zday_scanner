@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.core.models import Target, ScanResult
 from src.core.config import ScannerConfig
-from src.scanner.playwright_scanner import PlaywrightScanner, scan_target
+from src.core.scanner import ZDayScanner
 from src.reporting import JSONReporter, HTMLReporter, MarkdownReporter, ReportOptions
 
 
@@ -235,47 +235,8 @@ async def main():
 
     # Run scan
     try:
-        async with PlaywrightScanner(config) as scanner:
-            result = await scanner.scan(target)
-
-        # Generate reports if requested
-        if output_formats:
-            options = ReportOptions(
-                include_technologies=True,
-                include_vulnerabilities=True,
-                include_evidence=True,
-                include_remediation=True,
-                min_severity=args.min_severity,
-            )
-
-            reporters = {
-                "json": JSONReporter(options),
-                "html": HTMLReporter(options),
-                "markdown": MarkdownReporter(options),
-            }
-
-            for fmt in output_formats:
-                if fmt in reporters:
-                    try:
-                        report_content = reporters[fmt].generate(result)
-                        ext = reporters[fmt].get_extension()
-
-                        if args.output_dir:
-                            import os
-                            os.makedirs(args.output_dir, exist_ok=True)
-                            filename = f"zday_report_{result.scan_id if hasattr(result, 'scan_id') else 'scan'}{ext}"
-                            filepath = os.path.join(args.output_dir, filename)
-                            with open(filepath, 'w') as f:
-                                f.write(report_content)
-                            if not hasattr(result, 'reports'):
-                                result.reports = {}
-                            result.reports[fmt] = filepath
-                        else:
-                            if not hasattr(result, 'reports'):
-                                result.reports = {}
-                            result.reports[fmt] = report_content
-                    except Exception as e:
-                        result.errors.append(f"Report generation ({fmt}) failed: {e}")
+        async with ZDayScanner(config) as scanner:
+            result = await scanner.scan(target, output_formats, args.output_dir)
 
         print_summary(result)
 

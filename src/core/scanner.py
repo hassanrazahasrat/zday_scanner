@@ -18,7 +18,7 @@ from src.fingerprinting import (
 )
 from src.technologies import VersionDetector, CVEMatcher
 from src.zero_days import (
-    DetectionEngine, InjectionDetector, DeserializationDetector,
+    DetectionEngine, DetectionPhase, DetectionContext, InjectionDetector, DeserializationDetector,
     AuthBypassDetector, LogicDetector, RaceConditionDetector, CryptoDetector
 )
 from src.reporting import JSONReporter, HTMLReporter, MarkdownReporter, ReportOptions
@@ -45,7 +45,15 @@ class ZDayScanner:
         self.http_client = None
 
     async def __aenter__(self):
-        self.http_client = HTTPClient(self.config)
+        self.http_client = HTTPClient(
+            timeout=self.config.timeout,
+            rate_limit=self.config.rate_limit,
+            max_concurrent=self.config.max_concurrent,
+            verify_ssl=self.config.verify_ssl,
+            follow_redirects=self.config.follow_redirects,
+            proxy=self.config.proxy,
+            user_agent=self.config.user_agent,
+        )
         await self.http_client.__aenter__()
         return self
 
@@ -200,28 +208,37 @@ class ZDayScanner:
             engine.register(CryptoDetector(self.config))
 
         # Create detection context
-        det_context = context.target
-        det_context = context  # Use our ScanContext which has more fields
+        det_context = DetectionContext(
+            target=context.target,
+            http_client=context.http_client,
+            technologies=context.technologies,
+            custom_data={},
+            results=[],
+            errors=context.errors,
+        )
 
         # Run detection
-        phases = [engine.DetectionPhase.PASSIVE, engine.DetectionPhase.ACTIVE]
+        phases = [DetectionPhase.PASSIVE, DetectionPhase.ACTIVE]
         if self.config.enable_intrusive_tests:
-            phases.append(engine.DetectionPhase.INTRUSIVE)
+            phases.append(DetectionPhase.INTRUSIVE)
 
         vulns = await engine.run(det_context, phases)
         context.vulnerabilities.extend(vulns)
+        context.errors.extend(det_context.errors)
 
     async def _phase_reporting(self, context: ScanContext, scan_id: str,
                                output_formats: List[str], output_dir: str) -> ScanResult:
         """Phase 4: Reporting"""
         end_time = datetime.utcnow()
+        duration = (end_time - context.start_time).total_seconds()
 
         # Create scan result
         result = ScanResult(
             target=context.target,
             scan_id=scan_id,
             started_at=context.start_time,
-            end_time=end_time,
+            completed_at=end_time,
+            duration=duration,
             technologies=context.technologies,
             vulnerabilities=context.vulnerabilities,
             errors=context.errors,
